@@ -1,43 +1,42 @@
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++#
-#           КОНФІГУРАЦІЯ ДО ПЛАГІНА ЗВ'ЯЗУВАННЯ
+#           CONFIGURATION FOR TETHER PLUGIN
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++#
 
 
-
-# ШАНС НА ВДАЛЕ ЗВ'ЯЗУІВННЯ
+# CHANCE FOR SUCCESSFUL BINDING
 tether_chance: 100
 
-# КУЛДАУН МІЖ СПРОБАМИ ЗВ'ЯЗАТИ ЛЮДИНУ *хвилин
+# COOLDOWN BETWEEN BINDING ATTEMPTS *minutes
 tether_cooldown_minutes: 7
 
-# МАКМСИМАЛЬНА ДИСТАНЦІЯ ДЛЯ СПРОБИ ЗВ'ЯЗАТИ ГРАВЦЯ
+# MAXIMUM DISTANCE TO INITIATE BINDING
 tether_max_distance: 2
 
-# ЧАС ПОТРІБНИЙ ДЛЯ ЗВ'ЯЗУВАННЯ ГРАВЦЯ
+# TIME REQUIRED TO BIND A PLAYER *seconds
 tether_duration_seconds: 2
 
-# ЧАС КОЛИ ГРАВЕЦЬ БУДЕ ПРИВ'ЯЗАНИЙ ДО ЛЮДИНИ *ОКРЕМО ВІД ЕФЕКТІВ*
+# DURATION OF BINDING EFFECT *seconds (separate from debuffs)
 tether_effect_duration_seconds: 300
 
-# ДИСТАНЦІЯ ПІСЛЯ КОТРОХ ЛЮДИНУ ТЕЛЕПОРТУЄ ДО ЗВ'ЯЗУЮЧОГО
+# DISTANCE AT WHICH PLAYER IS TELEPORTED TO BINDER
 tether_pull_distance: 50
 
-# СИЛА ПІДШТОВХУВАННЯ ГРАЦВЯ ДО ЗВ'ЯЗУЮЧОГО
+# PUSH FORCE TOWARDS BINDER
 tether_pull_speed: 1.2
 
-# ЧАС ПОТРІБНИЙ ДЛЯ РОЗВ'ЯЗУВАННЯ ГРАВЦЯ
+# TIME REQUIRED TO UNBIND A PLAYER *seconds
 unbind_duration_seconds: 10
 
-# ДИСТАНЦІЯ НА КОТРУ МОЖЕ ВІДІЙТИ ЗВ'ЯЗАНИЙ ГРАВЕЦЬ
+# MAX DISTANCE A BOUND PLAYER CAN MOVE FROM BINDER
 binding_max_distance: 5
 
-# ШАНС НА ВДАЛЕ РОЗВ'ЯЗУВАННЯ
+# CHANCE FOR SUCCESSFUL UNBINDING
 unbind_chance: 100
 
-# КУЛДАУН МІЖ СПРОБАМИ РОЗВ'ЯЗАТИ ЛЮДИНУ *хвилин
+# COOLDOWN BETWEEN UNBINDING ATTEMPTS *minutes
 unbind_fail_cooldown_minutes: 1
 
-# ЕФЕКТИ *ОБЕРЕЖНО*
+# DEBUFFS
 debuffs:
   blindness:
     duration_seconds: 300
