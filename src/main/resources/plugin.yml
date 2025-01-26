@@ -1,0 +1,10 @@
+name: TetherThere
+version: '2.0'
+main: nulifie.xyz.tetherthere.Main
+api-version: '1.21.3'
+commands:
+  tether:
+    description: Основна команда плагіну для прив'язки.
+    usage: /tether <bind|unbind|resetbindcooldown|reload>
+    permission: tetherplugin.use
+    aliases: [tetherplugin]
