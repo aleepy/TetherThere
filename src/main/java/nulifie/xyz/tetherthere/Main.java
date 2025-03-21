@@ -4,6 +4,9 @@ import hetmanplugins.actionLog.ActionLog;
 import org.bukkit.ChatColor;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
+import nulifie.xyz.tetherthere.commands.CommandHandler;
+import nulifie.xyz.tetherthere.events.EventListener;
+import nulifie.xyz.tetherthere.models.TetherManager;
 
 public class Main extends JavaPlugin {
     private static ActionLog actionLogAPI;

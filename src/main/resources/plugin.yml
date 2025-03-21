@@ -1,6 +1,6 @@
 name: TetherThere
 author: aeleepy
-version: '2.1'
+version: '2.1.1'
 main: nulifie.xyz.tetherthere.Main
 api-version: '1.21.3'
 depend: [ActionLog]

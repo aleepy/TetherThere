@@ -1,4 +1,4 @@
-package nulifie.xyz.tetherthere;
+package nulifie.xyz.tetherthere.events;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -11,10 +11,13 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerInteractAtEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import nulifie.xyz.tetherthere.models.TetherManager;
+import nulifie.xyz.tetherthere.util.EffectUtil;
 
 public class EventListener implements Listener {
 
@@ -59,7 +62,7 @@ public class EventListener implements Listener {
                 }
 
                 long currentTime = System.currentTimeMillis();
-                long lastAttempt = tetherManager.getLastAttemptTime(player.getUniqueId());
+                long lastAttempt = tetherManager.getLastBindAttemptTime(player.getUniqueId());
 
                 if (currentTime - lastAttempt < tetherManager.getTetherCooldownMillis()) {
                     player.sendMessage(ChatColor.RED + "Почекайте трохи, перш ніж спробувати знову.");
@@ -198,7 +201,7 @@ public class EventListener implements Listener {
     public void onPlayerRespawn(PlayerRespawnEvent event) {
         Player player = event.getPlayer();
         if (tetherManager.isPlayerTethered(player)) {
-            tetherManager.removeDebuffs(player);
+            EffectUtil.removeDebuffs(player, tetherManager.getDebuffEffects());
         }
     }
 
