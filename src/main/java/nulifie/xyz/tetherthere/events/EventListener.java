@@ -51,8 +51,8 @@ public class EventListener implements Listener {
                     return;
                 }
 
-                if (tetherManager.isBindingInProgress(player) || tetherManager.isBindingInProgress(target)) {
-                    player.sendMessage(ChatColor.RED + "Спробуйте знову через деякий час.");
+                if (tetherManager.hasActiveBindingProcess(player) || tetherManager.hasActiveBindingProcess(target)) {
+                    player.sendMessage(ChatColor.RED + "Зачекайте, доки завершиться поточний процес зв'язування.");
                     return;
                 }
 
@@ -63,9 +63,16 @@ public class EventListener implements Listener {
 
                 long currentTime = System.currentTimeMillis();
                 long lastAttempt = tetherManager.getLastBindAttemptTime(player.getUniqueId());
+                long timeLeft = (lastAttempt + tetherManager.getTetherCooldownMillis()) - currentTime;
 
-                if (currentTime - lastAttempt < tetherManager.getTetherCooldownMillis()) {
-                    player.sendMessage(ChatColor.RED + "Почекайте трохи, перш ніж спробувати знову.");
+                // Дебаг інформація
+                Bukkit.getLogger().info("[TetherDebug] Спроба зв'язування через клік від " + player.getName());
+                Bukkit.getLogger().info("[TetherDebug] Останній час спроби: " + lastAttempt);
+                Bukkit.getLogger().info("[TetherDebug] Поточний час: " + currentTime);
+                Bukkit.getLogger().info("[TetherDebug] Час до кінця кулдауну: " + (timeLeft / 1000) + " секунд");
+
+                if (timeLeft > 0) {
+                    player.sendMessage(ChatColor.RED + "Почекайте ще " + (timeLeft / 1000) + " секунд.");
                     return;
                 }
 

@@ -17,6 +17,8 @@ public class TetherPullTask extends BukkitRunnable {
     private final double bindingMaxDistance;
     private final UUID targetId;
     private int soundTicks = 0;
+    private boolean wasPulling = false;
+    private Vector lastVelocity = null;
 
     public TetherPullTask(JavaPlugin plugin, Player tetherer, Player target, double tetherPullDistance, double tetherPullSpeed, double bindingMaxDistance) {
         this.plugin = plugin;
@@ -36,12 +38,21 @@ public class TetherPullTask extends BukkitRunnable {
         }
 
         double distance = target.getLocation().distance(tetherer.getLocation());
-        if (distance > bindingMaxDistance && distance <= tetherPullDistance) {
+        boolean isPulling = distance > bindingMaxDistance && distance <= tetherPullDistance;
+
+        if (isPulling) {
             Vector direction = tetherer.getLocation().toVector().subtract(target.getLocation().toVector()).normalize();
-            target.setVelocity(direction.multiply(tetherPullSpeed));
+            Vector newVelocity = direction.multiply(tetherPullSpeed);
             
-            // Відтворюємо звук кожні 20 тіків (1 секунда)
-            if (soundTicks >= 20) {
+            // Перевіряємо чи змінилася швидкість
+            boolean velocityChanged = lastVelocity == null || !lastVelocity.equals(newVelocity);
+            
+            // Встановлюємо нову швидкість
+            target.setVelocity(newVelocity);
+            lastVelocity = newVelocity;
+            
+            // Відтворюємо звук при кожному підтягуванні, але не частіше ніж раз на 20 тіків
+            if (velocityChanged && soundTicks >= 20) {
                 target.playSound(target.getLocation(), Sound.ENTITY_LEASH_KNOT_PLACE, 1.0f, 1.0f);
                 soundTicks = 0;
             }
@@ -50,7 +61,16 @@ public class TetherPullTask extends BukkitRunnable {
             target.teleport(tetherer.getLocation());
             target.sendMessage(org.bukkit.ChatColor.YELLOW + "Вас витягли назад до " + tetherer.getName() + " мотузкою!");
             target.playSound(target.getLocation(), Sound.ENTITY_LEASH_KNOT_PLACE, 1.0f, 1.0f);
+            lastVelocity = null;
+        } else {
+            lastVelocity = null;
         }
+
+        // Скидаємо лічильник тіків, якщо підтягування припинилося
+        if (!isPulling && wasPulling) {
+            soundTicks = 0;
+        }
+        wasPulling = isPulling;
     }
 
     public UUID getTargetId() {
