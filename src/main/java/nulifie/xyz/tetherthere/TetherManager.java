@@ -1,11 +1,10 @@
 package nulifie.xyz.tetherthere;
 
+import hetmanplugins.actionLog.models.DangerLevel;
+import static hetmanplugins.actionLog.util.ActionLogManager.*;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Sound;
-import org.bukkit.boss.BarColor;
-import org.bukkit.boss.BarStyle;
-import org.bukkit.boss.BossBar;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Bat;
 import org.bukkit.entity.Player;
@@ -24,7 +23,7 @@ public class TetherManager {
     private final HashMap<UUID, UUID> tetheredPlayers = new HashMap<>();
     private final HashMap<UUID, Long> lastAttemptTime = new HashMap<>();
     private final HashMap<UUID, BukkitRunnable> bindingTasks = new HashMap<>();
-    private final HashMap<UUID, BossBar> bindingBars = new HashMap<>();
+    private final HashMap<UUID, BukkitRunnable> tetherTimers = new HashMap<>();
 
     private int tetherChance;
     private long tetherCooldownMillis;
@@ -45,62 +44,86 @@ public class TetherManager {
         loadConfigValues();
     }
 
+    private String createProgressBar(int current, int max, int bars, ChatColor filledColor, ChatColor emptyColor) {
+        float percent = (float) current / max;
+        int progressBars = Math.round(bars * percent);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(ChatColor.GRAY).append("[");
+        sb.append(filledColor);
+        for (int i = 0; i < progressBars; i++) {
+            sb.append("|");
+        }
+        sb.append(emptyColor);
+        for (int i = progressBars; i < bars; i++) {
+            sb.append("|");
+        }
+        sb.append(ChatColor.GRAY).append("]");
+        return sb.toString();
+    }
+
     public void startUnbindingProcess(Player player, Player target) {
-        if (isBindingInProgress(player)) {
-            player.sendMessage(ChatColor.RED + "Ви вже розв'язуєте когось. Зачекайте завершення.");
+        Player tetherer = getTetherer(target);
+        if (tetherer == null) {
+            player.sendMessage(ChatColor.RED + "Цей гравець не прив'язаний.");
             return;
         }
+
         long currentTime = System.currentTimeMillis();
         long lastUnbindAttempt = getLastUnbindAttemptTime(player.getUniqueId());
         if (currentTime - lastUnbindAttempt < getUnbindFailCooldownMillis()) {
             player.sendMessage(ChatColor.RED + "Почекайте трохи, перш ніж спробувати знову.");
             return;
         }
-        BossBar bossBar = Bukkit.createBossBar("Розв'язування...", BarColor.BLUE, BarStyle.SOLID);
-        bossBar.setProgress(0);
-        bossBar.addPlayer(player);
-        bossBar.addPlayer(target);
-        bindingBars.put(player.getUniqueId(), bossBar);
+
         BukkitRunnable unbindingTask = new BukkitRunnable() {
             int ticks = 0;
             final int unbindDurationTicks = plugin.getConfig().getInt("unbind_duration_seconds") * 20;
+
             @Override
             public void run() {
                 if (player.isOnline() && target.isOnline() && player.getLocation().distance(target.getLocation()) <= maxTetherDistance) {
                     ticks++;
-                    bossBar.setProgress(ticks / (double) unbindDurationTicks);
+
+                    String progress = createProgressBar(
+                            ticks,
+                            unbindDurationTicks,
+                            20,
+                            ChatColor.BLUE,
+                            ChatColor.DARK_GRAY
+                    );
+
+                    String actionBar = ChatColor.AQUA + "Розв'язування: " + progress + " " + ChatColor.GRAY + (unbindDurationTicks/20 - ticks/20) + "с";
+                    player.sendActionBar(actionBar);
+                    target.sendActionBar(actionBar);
+
                     if (ticks >= unbindDurationTicks) {
-                        unbindPlayers(player, target);
+                        unbindPlayers(target, tetherer);
                         player.sendMessage(ChatColor.GREEN + "Ви успішно розв'язали " + target.getName() + ".");
                         target.sendMessage(ChatColor.GREEN + "Вас розв'язав " + player.getName() + ".");
                         bindingTasks.remove(player.getUniqueId());
-                        bindingBars.remove(player.getUniqueId()).removeAll();
                         setLastUnbindAttemptTime(player.getUniqueId(), System.currentTimeMillis());
+                        clearActionBars(player, target);
                         this.cancel();
                     }
                 } else {
                     player.sendMessage(ChatColor.RED + "Не вдалось розв'язати. Ви занадто далеко.");
                     bindingTasks.remove(player.getUniqueId());
-                    bindingBars.remove(player.getUniqueId()).removeAll();
-                    // Устанавливаем кулдаун при неудачной попытке
                     setLastUnbindAttemptTime(player.getUniqueId(), System.currentTimeMillis());
+                    clearActionBars(player, target);
                     this.cancel();
                 }
             }
         };
+
         bindingTasks.put(player.getUniqueId(), unbindingTask);
         unbindingTask.runTaskTimer(plugin, 0, 1);
     }
+
     public void startBindingProcess(Player player, Player target) {
         lastAttemptTime.put(player.getUniqueId(), System.currentTimeMillis());
 
         player.sendMessage(ChatColor.YELLOW + "Зв'язування... Тримайтеся поруч протягом " + (tetherDurationTicks / 20) + " секунд.");
-        BossBar bossBar = Bukkit.createBossBar("Зв'язування...", BarColor.RED, BarStyle.SOLID);
-        bossBar.setProgress(0);
-        bossBar.addPlayer(player);
-        bossBar.addPlayer(target);
-        bindingBars.put(player.getUniqueId(), bossBar);
-
         showBindingTitle(player, target);
 
         BukkitRunnable bindingTask = new BukkitRunnable() {
@@ -110,23 +133,44 @@ public class TetherManager {
             public void run() {
                 if (player.isOnline() && target.isOnline() && player.getLocation().distance(target.getLocation()) <= maxTetherDistance) {
                     ticks++;
-                    bossBar.setProgress(ticks / (double) tetherDurationTicks);
+
+                    String progress = createProgressBar(
+                            ticks,
+                            tetherDurationTicks,
+                            20,
+                            ChatColor.RED,
+                            ChatColor.DARK_GRAY
+                    );
+
+                    String actionBar = ChatColor.GOLD + "Зв'язування: " + progress + " " + ChatColor.GRAY + (tetherDurationTicks/20 - ticks/20) + "с";
+                    player.sendActionBar(actionBar);
+                    target.sendActionBar(actionBar);
+
                     if (ticks >= tetherDurationTicks) {
                         tetherPlayers(player, target);
                         bindingTasks.remove(player.getUniqueId());
-                        bindingBars.remove(player.getUniqueId()).removeAll();
+                        clearActionBars(player, target);
                         this.cancel();
                     }
                 } else {
                     player.sendMessage(ChatColor.RED + "Не вдалось зв'язати.");
                     bindingTasks.remove(player.getUniqueId());
-                    bindingBars.remove(player.getUniqueId()).removeAll();
+                    clearActionBars(player, target);
                     this.cancel();
                 }
             }
         };
+
         bindingTasks.put(player.getUniqueId(), bindingTask);
         bindingTask.runTaskTimer(plugin, 0, 1);
+    }
+
+    private void clearActionBars(Player... players) {
+        for (Player p : players) {
+            if (p != null && p.isOnline()) {
+                p.sendActionBar("");
+            }
+        }
     }
 
     public void loadConfigValues() {
@@ -138,7 +182,7 @@ public class TetherManager {
         tetherPullDistance = plugin.getConfig().getDouble("tether_pull_distance");
         tetherPullSpeed = plugin.getConfig().getDouble("tether_pull_speed");
         unbindChance = plugin.getConfig().getInt("unbind_chance");
-        unbindFailCooldownMillis = plugin.getConfig().getInt("unbind_fail_cooldown_minutes") * 60 * 1000; // Минуты в миллисекунды
+        unbindFailCooldownMillis = plugin.getConfig().getInt("unbind_fail_cooldown_minutes") * 60 * 1000;
         bindingMaxDistance = plugin.getConfig().getDouble("binding_max_distance");
 
         debuffEffects.clear();
@@ -205,27 +249,64 @@ public class TetherManager {
         lastAttemptTime.clear();
         bindingTasks.forEach((uuid, task) -> task.cancel());
         bindingTasks.clear();
-        bindingBars.forEach((uuid, bar) -> bar.removeAll());
-        bindingBars.clear();
+        tetherTimers.forEach((uuid, task) -> task.cancel());
+        tetherTimers.clear();
         lastUnbindAttemptTime.clear();
+        clearActionBars(Bukkit.getOnlinePlayers().toArray(new Player[0]));
     }
 
     public boolean isPlayerTethered(Player player) {
         return tetheredPlayers.containsKey(player.getUniqueId());
     }
+
     public void showBindingTitle(Player player, Player target) {
-        target.sendTitle(ChatColor.RED + "Зв'язування...", ChatColor.LIGHT_PURPLE + "Вас Зв'язує " + player.getName(), 10, 70, 20);
+        target.sendTitle(ChatColor.RED + "Зв'язування...", ChatColor.LIGHT_PURPLE + "Вас зв'язує " + player.getName(), 10, 70, 20);
     }
+
     public void tetherPlayers(Player tetherer, Player target) {
         tetheredPlayers.put(target.getUniqueId(), tetherer.getUniqueId());
         tetherer.sendMessage(ChatColor.GREEN + "Ви успішно зв'язали " + target.getName() + ".");
         target.sendMessage(ChatColor.RED + "Ви були зв'язані " + tetherer.getName() + ".");
-
-
         target.sendTitle(ChatColor.RED + "Вас Зв'язали", "", 10, 40, 10);
+
+        // Оновлення рівня небезпеки
+        updateDangerLevels(tetherer, target);
 
         applyDebuffs(target);
         createLeashEffect(tetherer, target);
+
+        BukkitRunnable timerTask = new BukkitRunnable() {
+            int remainingTicks = tetherEffectDurationTicks;
+
+            @Override
+            public void run() {
+                if (!tetheredPlayers.containsKey(target.getUniqueId())) {
+                    this.cancel();
+                    return;
+                }
+
+                remainingTicks--;
+
+                String progress = createProgressBar(
+                        remainingTicks,
+                        tetherEffectDurationTicks,
+                        20,
+                        ChatColor.LIGHT_PURPLE,
+                        ChatColor.DARK_GRAY
+                );
+
+                String actionBar = ChatColor.LIGHT_PURPLE + "Зв'язаний: " + progress + " " + ChatColor.GRAY + (remainingTicks/20) + "с";
+                tetherer.sendActionBar(actionBar);
+                target.sendActionBar(actionBar);
+
+                if (remainingTicks <= 0) {
+                    this.cancel();
+                }
+            }
+        };
+
+        timerTask.runTaskTimer(plugin, 0, 1);
+        tetherTimers.put(target.getUniqueId(), timerTask);
 
         new BukkitRunnable() {
             @Override
@@ -242,16 +323,16 @@ public class TetherManager {
             @Override
             public void run() {
                 if (tetheredPlayers.containsKey(target.getUniqueId())) {
-                    Player tetherer = Bukkit.getPlayer(tetheredPlayers.get(target.getUniqueId()));
-                    if (tetherer != null && tetherer.isOnline()) {
-                        double distance = target.getLocation().distance(tetherer.getLocation());
+                    Player tethererOnline = Bukkit.getPlayer(tetheredPlayers.get(target.getUniqueId()));
+                    if (tethererOnline != null && tethererOnline.isOnline()) {
+                        double distance = target.getLocation().distance(tethererOnline.getLocation());
                         if (distance > bindingMaxDistance && distance <= tetherPullDistance) {
-                            Vector direction = tetherer.getLocation().toVector().subtract(target.getLocation().toVector()).normalize();
+                            Vector direction = tethererOnline.getLocation().toVector().subtract(target.getLocation().toVector()).normalize();
                             target.setVelocity(direction.multiply(tetherPullSpeed));
                             target.playSound(target.getLocation(), Sound.ENTITY_LEASH_KNOT_PLACE, 1.0f, 1.0f);
                         } else if (distance > tetherPullDistance) {
-                            target.teleport(tetherer.getLocation());
-                            target.sendMessage(ChatColor.YELLOW + "Вас витягли назад до " + tetherer.getName() + " мотузкою!");
+                            target.teleport(tethererOnline.getLocation());
+                            target.sendMessage(ChatColor.YELLOW + "Вас витягли назад до " + tethererOnline.getName() + " мотузкою!");
                         }
                     } else {
                         this.cancel();
@@ -264,17 +345,53 @@ public class TetherManager {
     }
 
     public void unbindPlayers(Player player1, Player player2) {
-        if (tetheredPlayers.containsKey(player1.getUniqueId()) && tetheredPlayers.get(player1.getUniqueId()).equals(player2.getUniqueId())) {
-            tetheredPlayers.remove(player1.getUniqueId());
-            removeDebuffs(player1);
-            removeDebuffs(player2);
-        } else if (tetheredPlayers.containsKey(player2.getUniqueId()) && tetheredPlayers.get(player2.getUniqueId()).equals(player1.getUniqueId())) {
-            tetheredPlayers.remove(player2.getUniqueId());
-            removeDebuffs(player1);
-            removeDebuffs(player2);
+        Player[] players = {player1, player2};
+
+        for (Player p : players) {
+            if (tetheredPlayers.containsKey(p.getUniqueId())) {
+                BukkitRunnable timer = tetherTimers.remove(p.getUniqueId());
+                if (timer != null) timer.cancel();
+                tetheredPlayers.remove(p.getUniqueId());
+                removeDebuffs(p);
+                p.sendActionBar("");
+
+
+                if (Main.getActionLogAPI() != null) {
+                    updatePlayerDanger(p, -50);
+                }
+            }
         }
 
+        clearActionBars(player1, player2);
         lastUnbindAttemptTime.put(player1.getUniqueId(), System.currentTimeMillis());
+    }
+
+    private void updateDangerLevels(Player tetherer, Player target) {
+        if (Main.getActionLogAPI() != null) {
+            int dangerIncrease = plugin.getConfig().getInt("danger_level_increase", 10);
+            updatePlayerDanger(tetherer, dangerIncrease);
+            updatePlayerDanger(target, dangerIncrease);
+
+            if (plugin.getConfig().getBoolean("show_danger_messages", true)) {
+            }
+        }
+    }
+
+    private void updatePlayerDanger(Player player, int amount) {
+        try {
+            DangerLevel dangerLevel = getDangerLevel(player.getName());
+            if (dangerLevel == null) {
+                dangerLevel = new DangerLevel(player);
+                setDangerLevel(player.getName(), dangerLevel);
+            }
+            dangerLevel.updateDanger(amount);
+
+            if (dangerLevel.getDanger() > 100) {
+                dangerLevel.setDanger(100);
+            }
+        } catch (Exception e) {
+            Bukkit.getLogger().severe("Помилка оновлення небезпеки для " + player.getName() + ": " + e.getMessage());
+        }
     }
 
     private void applyDebuffs(Player player) {
@@ -299,7 +416,6 @@ public class TetherManager {
             bat.setPersistent(true);
             bat.setAI(false);
         });
-
         tetherBat.setLeashHolder(tetherer);
 
         new BukkitRunnable() {

@@ -1,7 +1,9 @@
 name: TetherThere
-version: '2.0'
+author: aeleepy
+version: '2.1'
 main: nulifie.xyz.tetherthere.Main
 api-version: '1.21.3'
+depend: [ActionLog]
 commands:
   tether:
     description: Основна команда плагіну для прив'язки.
